@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"io"
+	"log"
 	"net"
-	"strings"
+
+	"github.com/livingpool/httpfromtcp/internal/request"
 )
 
 func main() {
@@ -22,51 +23,20 @@ func main() {
 
 		fmt.Println("connection accepted:", conn.RemoteAddr())
 
-		ch := getLinesChannel(conn)
-		for line := range ch {
-			fmt.Println(line)
+		req, err := request.RequestFromReader(conn)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("Request line:")
+		fmt.Println("- Method:", req.RequestLine.Method)
+		fmt.Println("- Target:", req.RequestLine.RequestTarget)
+		fmt.Println("- Version:", req.RequestLine.HttpVersion)
+
+		fmt.Println("Headers:")
+		for k, v := range req.Headers {
+			fmt.Printf("- %s: %s\n", k, v)
 		}
 
 		fmt.Println("connection and channel closed.")
 	}
-}
-
-func getLinesChannel(f io.ReadCloser) <-chan string {
-	resCh := make(chan string)
-
-	go func() {
-		defer func() {
-			f.Close()
-			close(resCh)
-		}()
-
-		line := ""
-		for {
-			data := make([]byte, 8)
-
-			n, err := f.Read(data)
-			if err != nil && err != io.EOF {
-				panic(err)
-			}
-
-			if n == 0 {
-				if len(line) > 0 {
-					resCh <- line
-				}
-				break
-			}
-
-			dataStr := string(data)
-			if strings.Contains(dataStr, "\n") {
-				tokens := strings.Split(dataStr, "\n")
-				line += tokens[0]
-				resCh <- line
-				line = tokens[1]
-			} else {
-				line += dataStr
-			}
-		}
-	}()
-
-	return resCh
 }
