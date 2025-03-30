@@ -9,6 +9,7 @@ import (
 )
 
 type StatusCode int
+type writerState int
 
 const (
 	StatusOK            = StatusCode(200)
@@ -16,7 +17,35 @@ const (
 	StatusInternalError = StatusCode(500)
 )
 
-func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
+const (
+	writingStatusLine writerState = iota
+	writingHeaders
+	writingBody
+	writingDone
+)
+
+type Writer struct {
+	stream      io.Writer
+	writerState writerState
+}
+
+func NewResponseWriter(stream io.Writer) *Writer {
+	return &Writer{
+		stream:      stream,
+		writerState: writingStatusLine,
+	}
+}
+
+func (w *Writer) Write(p []byte) (int, error) {
+	n, err := w.stream.Write(p)
+	return n, err
+}
+
+func (w *Writer) WriteStatusLine(statusCode StatusCode) error {
+	if w.writerState != writingStatusLine {
+		return fmt.Errorf("state is not writingStatusLine")
+	}
+
 	reasonPhrase := ""
 
 	switch statusCode {
@@ -34,7 +63,36 @@ func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
 		return err
 	}
 
+	w.writerState = writingHeaders
 	return nil
+}
+
+func (w *Writer) WriteHeaders(headers headers.Headers) error {
+	if w.writerState != writingHeaders {
+		return fmt.Errorf("state is not writingHeaders")
+	}
+
+	for k, v := range headers {
+		fieldLine := fmt.Sprintf("%s: %s\r\n", k, v)
+		_, err := w.Write([]byte(fieldLine))
+		if err != nil {
+			return err
+		}
+	}
+
+	w.writerState = writingBody
+	_, err := w.Write([]byte("\r\n"))
+	return err
+}
+
+func (w *Writer) WriteBody(body []byte) (int, error) {
+	if w.writerState != writingBody {
+		return 0, fmt.Errorf("state is not writingBody")
+	}
+
+	w.writerState = writingDone
+	n, err := w.Write(body)
+	return n, err
 }
 
 func GetDefaultHeaders(contentLen int) headers.Headers {
@@ -45,21 +103,4 @@ func GetDefaultHeaders(contentLen int) headers.Headers {
 	headers.Set("Content-Type", "text/plain")
 
 	return headers
-}
-
-func WriteHeaders(w io.Writer, headers headers.Headers) error {
-	for k, v := range headers {
-		fieldLine := fmt.Sprintf("%s: %s\r\n", k, v)
-		_, err := w.Write([]byte(fieldLine))
-		if err != nil {
-			return err
-		}
-	}
-	_, err := w.Write([]byte("\r\n"))
-	return err
-}
-
-func WriteBody(w io.Writer, body []byte) (int, error) {
-	n, err := w.Write(body)
-	return n, err
 }

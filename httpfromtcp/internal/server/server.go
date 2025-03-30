@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 	"net"
@@ -17,6 +16,8 @@ type Server struct {
 	IsAlive  *atomic.Bool
 	Handler  Handler
 }
+
+type Handler func(w *response.Writer, req *request.Request)
 
 func Serve(port int, handler Handler) (*Server, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
@@ -65,27 +66,8 @@ func (s *Server) handle(conn net.Conn) {
 		log.Fatalf("error reading request: %v", err)
 	}
 
-	buf := bytes.NewBuffer([]byte{})
-	handlerError := s.Handler(buf, req)
-	if handlerError != nil {
-		handlerError.Write(conn)
-		return
-	}
-
-	if err := response.WriteStatusLine(conn, 200); err != nil {
-		log.Fatalf("error writing response status line: %v", err)
-	}
-
-	body := buf.Bytes()
-
-	headers := response.GetDefaultHeaders(len(body))
-	if err := response.WriteHeaders(conn, headers); err != nil {
-		log.Fatalf("error writing respones headers: %v", err)
-	}
-
-	if _, err := response.WriteBody(conn, body); err != nil {
-		log.Fatalf("error writing response body: %v", err)
-	}
+	writer := response.NewResponseWriter(conn)
+	s.Handler(writer, req)
 
 	if err := conn.Close(); err != nil {
 		log.Fatalf("error closing connection: %v", err)

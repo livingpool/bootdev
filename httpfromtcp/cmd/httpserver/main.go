@@ -1,13 +1,13 @@
 package main
 
 import (
-	"io"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/livingpool/httpfromtcp/internal/request"
+	"github.com/livingpool/httpfromtcp/internal/response"
 	"github.com/livingpool/httpfromtcp/internal/server"
 )
 
@@ -32,19 +32,57 @@ func main() {
 	log.Println("Server gracefully stopped")
 }
 
-func handler(w io.Writer, req *request.Request) *server.HandlerError {
-	if req.RequestLine.RequestTarget == "/yourproblem" {
-		return &server.HandlerError{
-			StatusCode: 400,
-			Message:    "Your problem is not my problem\n",
-		}
+func handler(w *response.Writer, req *request.Request) {
+	switch req.RequestLine.RequestTarget {
+	case "/yourproblem":
+		w.WriteStatusLine(response.StatusBadRequest)
+		h := response.GetDefaultHeaders(len(badReqHTML))
+		h.Override("Content-Type", "text/html")
+		w.WriteHeaders(h)
+		w.WriteBody([]byte(badReqHTML))
+	case "/myproblem":
+		w.WriteStatusLine(response.StatusInternalError)
+		h := response.GetDefaultHeaders(len(internalErrorHTML))
+		h.Override("Content-Type", "text/html")
+		w.WriteHeaders(h)
+		w.WriteBody([]byte(internalErrorHTML))
+	default:
+		w.WriteStatusLine(response.StatusOK)
+		h := response.GetDefaultHeaders(len(successHTML))
+		h.Override("Content-Type", "text/html")
+		w.WriteHeaders(h)
+		w.WriteBody([]byte(successHTML))
 	}
-	if req.RequestLine.RequestTarget == "/myproblem" {
-		return &server.HandlerError{
-			StatusCode: 500,
-			Message:    "Woopsie, my bad\n",
-		}
-	}
-	w.Write([]byte("All good, frfr\n"))
-	return nil
 }
+
+const (
+	successHTML = `<html>
+  <head>
+    <title>200 OK</title>
+  </head>
+  <body>
+    <h1>Success!</h1>
+    <p>Your request was an absolute banger.</p>
+  </body>
+</html>`
+
+	badReqHTML = `<html>
+  <head>
+    <title>400 Bad Request</title>
+  </head>
+  <body>
+    <h1>Bad Request</h1>
+    <p>Your request honestly kinda sucked.</p>
+  </body>
+</html>`
+
+	internalErrorHTML = `<html>
+  <head>
+    <title>500 Internal Server Error</title>
+  </head>
+  <body>
+    <h1>Internal Server Error</h1>
+    <p>Okay, you know what? This one is on me.</p>
+  </body>
+</html>`
+)
