@@ -1,19 +1,24 @@
 package server
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"net"
 	"sync/atomic"
+
+	"github.com/livingpool/httpfromtcp/internal/request"
+	"github.com/livingpool/httpfromtcp/internal/response"
 )
 
 type Server struct {
 	Port     int
 	Listener net.Listener
 	IsAlive  *atomic.Bool
+	Handler  Handler
 }
 
-func Serve(port int) (*Server, error) {
+func Serve(port int, handler Handler) (*Server, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return nil, err
@@ -26,6 +31,7 @@ func Serve(port int) (*Server, error) {
 		Port:     port,
 		Listener: listener,
 		IsAlive:  state,
+		Handler:  handler,
 	}
 
 	go server.listen()
@@ -54,12 +60,32 @@ func (s *Server) listen() {
 }
 
 func (s *Server) handle(conn net.Conn) {
-	response := "HTTP/1.1 200 OK\r\n" + // Status line
-		"Content-Type: text/plain\r\n" + // Example header
-		"\r\n" + // Blank line to separate headers from the body
-		"Hello World!\n" // Body
+	req, err := request.RequestFromReader(conn)
+	if err != nil {
+		log.Fatalf("error reading request: %v", err)
+	}
 
-	conn.Write([]byte(response))
+	buf := bytes.NewBuffer([]byte{})
+	handlerError := s.Handler(buf, req)
+	if handlerError != nil {
+		handlerError.Write(conn)
+		return
+	}
+
+	if err := response.WriteStatusLine(conn, 200); err != nil {
+		log.Fatalf("error writing response status line: %v", err)
+	}
+
+	body := buf.Bytes()
+
+	headers := response.GetDefaultHeaders(len(body))
+	if err := response.WriteHeaders(conn, headers); err != nil {
+		log.Fatalf("error writing respones headers: %v", err)
+	}
+
+	if _, err := response.WriteBody(conn, body); err != nil {
+		log.Fatalf("error writing response body: %v", err)
+	}
 
 	if err := conn.Close(); err != nil {
 		log.Fatalf("error closing connection: %v", err)
