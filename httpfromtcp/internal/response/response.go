@@ -95,6 +95,40 @@ func (w *Writer) WriteBody(body []byte) (int, error) {
 	return n, err
 }
 
+func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
+	if w.writerState != writingBody {
+		return 0, fmt.Errorf("state is not writingBody")
+	}
+
+	totalBytesWritten := 0
+
+	chunkLen := fmt.Sprintf("%x", len(p)) + "\r\n"
+	n, err := w.Write([]byte(chunkLen))
+	totalBytesWritten += n
+	if err != nil {
+		return totalBytesWritten, err
+	}
+	n, err = w.Write(p)
+	totalBytesWritten += n
+	if err != nil {
+		return totalBytesWritten, err
+	}
+
+	n, err = w.Write([]byte("\r\n"))
+	totalBytesWritten += n
+	if err != nil {
+		return totalBytesWritten, err
+	}
+
+	return totalBytesWritten, nil
+}
+
+func (w *Writer) WriteChunkedBodyDone() (int, error) {
+	w.writerState = writingDone
+	n, err := w.Write([]byte("0\r\n\r\n"))
+	return n, err
+}
+
 func GetDefaultHeaders(contentLen int) headers.Headers {
 	headers := headers.NewHeaders()
 

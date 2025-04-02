@@ -62,6 +62,11 @@ func (h Headers) Override(key, value string) {
 	h[key] = value
 }
 
+func (h Headers) Delete(key string) {
+	key = strings.ToLower(key)
+	delete(h, key)
+}
+
 // RFC 9110 5.1 and 5.6.2
 var tokenChars = []byte{'!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~'}
 

@@ -1,9 +1,14 @@
 package main
 
 import (
+	"errors"
+	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/livingpool/httpfromtcp/internal/request"
@@ -33,6 +38,11 @@ func main() {
 }
 
 func handler(w *response.Writer, req *request.Request) {
+	if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin") {
+		proxyHandler(w, req)
+		return
+	}
+
 	switch req.RequestLine.RequestTarget {
 	case "/yourproblem":
 		w.WriteStatusLine(response.StatusBadRequest)
@@ -52,6 +62,48 @@ func handler(w *response.Writer, req *request.Request) {
 		h.Override("Content-Type", "text/html")
 		w.WriteHeaders(h)
 		w.WriteBody([]byte(successHTML))
+	}
+}
+
+// I recommend using netcat to test your chunked responses.
+// Curl will abstract away the chunking for you, so you won't see your hex and cr and lf characters in your terminal if you use curl.
+// I used this command to see my raw chunked response:
+// echo -e "GET /httpbin/stream/100 HTTP/1.1\r\nHost: localhost:42069\r\nConnection: close\r\n\r\n" | nc localhost 42069
+func proxyHandler(w *response.Writer, req *request.Request) {
+	target := req.RequestLine.RequestTarget
+	if strings.HasPrefix(target, "/httpbin") {
+		url := "https://httpbin.org/" + strings.TrimPrefix(target, "/httpbin")
+		resp, err := http.Get(url)
+		if err != nil {
+			log.Fatalf("error connecting to httpbin.org: %v", err)
+		}
+
+		// the headers are only written at the start
+		w.WriteStatusLine(response.StatusOK)
+		h := response.GetDefaultHeaders(0)
+		h.Delete("Content-Type")
+		h.Set("Transfer-Encoding", "chunked")
+		w.WriteHeaders(h)
+
+		buf := make([]byte, 1024)
+		for {
+			n, err := resp.Body.Read(buf)
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					if _, err := w.WriteChunkedBodyDone(); err != nil {
+						log.Fatalf("error writing chunked body done: %v", err)
+					}
+					return
+				}
+				log.Fatalf("error reading from httpbin.org: %v", err)
+			}
+
+			fmt.Printf("read %d bytes from httpbin.org...\n", n)
+
+			if _, err := w.WriteChunkedBody(buf[:n]); err != nil {
+				log.Fatalf("error writing chunked body: %v", err)
+			}
+		}
 	}
 }
 
