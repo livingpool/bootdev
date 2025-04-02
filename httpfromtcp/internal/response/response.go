@@ -125,8 +125,17 @@ func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
 
 func (w *Writer) WriteChunkedBodyDone() (int, error) {
 	w.writerState = writingDone
-	n, err := w.Write([]byte("0\r\n\r\n"))
+	n, err := w.Write([]byte("0\r\n"))
 	return n, err
+}
+
+func (w *Writer) WriteTrailers(h headers.Headers) error {
+	w.writerState = writingHeaders
+	return w.WriteHeaders(h)
+}
+
+func GetEmptyHeaders() headers.Headers {
+	return headers.NewHeaders()
 }
 
 func GetDefaultHeaders(contentLen int) headers.Headers {
