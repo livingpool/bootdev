@@ -58,6 +58,8 @@ func handler(w *response.Writer, req *request.Request) {
 		h.Override("Content-Type", "text/html")
 		w.WriteHeaders(h)
 		w.WriteBody([]byte(internalErrorHTML))
+	case "/video":
+		videoHandler(w, req)
 	default:
 		w.WriteStatusLine(response.StatusOK)
 		h := response.GetDefaultHeaders(len(successHTML))
@@ -71,6 +73,7 @@ func handler(w *response.Writer, req *request.Request) {
 // Curl will abstract away the chunking for you, so you won't see your hex and cr and lf characters in your terminal if you use curl.
 // I used this command to see my raw chunked response:
 // echo -e "GET /httpbin/stream/100 HTTP/1.1\r\nHost: localhost:42069\r\nConnection: close\r\n\r\n" | nc localhost 42069
+// use curl --raw -v to view the whole thing
 func proxyHandler(w *response.Writer, req *request.Request) {
 	target := req.RequestLine.RequestTarget
 
@@ -123,6 +126,20 @@ func proxyHandler(w *response.Writer, req *request.Request) {
 			log.Fatalf("error writing chunked body: %v", err)
 		}
 	}
+}
+
+// navigate to http://localhost:42069/video in your browser... does it work?
+func videoHandler(w *response.Writer, req *request.Request) {
+	f, err := os.ReadFile("./assets/vim.mp4")
+	if err != nil {
+		log.Fatalf("error reading video file: %v", err)
+	}
+
+	w.WriteStatusLine(response.StatusOK)
+	h := response.GetDefaultHeaders(len(f))
+	h.Override("Content-Type", "video/mp4")
+	w.WriteHeaders(h)
+	w.WriteBody(f)
 }
 
 const (
