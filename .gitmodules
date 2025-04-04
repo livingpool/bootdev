@@ -1,0 +1,9 @@
+[submodule "pubsub"]
+	path = learn-pub-sub-starter
+	url = git@github.com:livingpool/learn-pub-sub-starter.git
+[submodule "cicd"]
+	path = learn-cicd-starter
+	url = git@github.com:livingpool/learn-cicd-starter.git
+[submodule "git2"]
+	path = megacorp
+	url = git@github.com:livingpool/megacorp.git
