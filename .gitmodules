@@ -7,3 +7,6 @@
 [submodule "git2"]
 	path = megacorp
 	url = git@github.com:livingpool/megacorp.git
+[submodule "learn-file-storage-s3-golang-starter"]
+	path = learn-file-storage-s3-golang-starter
+	url = git@github.com:livingpool/learn-file-storage-s3-golang-starter.git
