@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/url"
 	"os"
+	"sync"
 
 	"github.com/livingpool/bootdev-crawler/util"
 )
@@ -20,14 +22,25 @@ func main() {
 
 	fmt.Println("starting crawler of:", args[1])
 
-	pages := make(map[string]int)
-	err := util.CrawlPage(args[1], args[1], pages)
+	baseURL, err := url.Parse(args[1])
 	if err != nil {
-		log.Fatalf("crawler error: %v", err)
+		log.Fatalf("error parsing '%s': err: %v", args[1], err)
 	}
 
+	config := util.Config{
+		Pages:              make(map[string]int),
+		BaseURL:            baseURL,
+		Mu:                 &sync.RWMutex{},
+		ConcurrencyControl: make(chan struct{}, 1),
+		Wg:                 &sync.WaitGroup{},
+	}
+
+	config.Wg.Add(1)
+	go config.CrawlPage(baseURL.String())
+	config.Wg.Wait()
+
 	fmt.Println("crawler results:")
-	for k, v := range pages {
-		fmt.Printf("%s: %d", k, v)
+	for k, v := range config.Pages {
+		fmt.Printf("%s: %d\n", k, v)
 	}
 }

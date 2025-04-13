@@ -6,58 +6,77 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 )
 
-func CrawlPage(rawBaseURL, rawCurrentURL string, pages map[string]int) error {
-	parsedRawBaseURL, err := url.Parse(rawBaseURL)
-	if err != nil {
-		return fmt.Errorf("couldn't parse '%s', err: %v\n", rawBaseURL, err)
-	}
+type Config struct {
+	Pages              map[string]int
+	BaseURL            *url.URL
+	Mu                 *sync.Mutex
+	ConcurrencyControl chan struct{}
+	Wg                 *sync.WaitGroup
+}
+
+func (cfg *Config) CrawlPage(rawCurrentURL string) {
+	defer func() {
+		cfg.Wg.Done()
+		<-cfg.ConcurrencyControl
+	}()
+
+	cfg.ConcurrencyControl <- struct{}{}
+	// fmt.Println("crawling", rawCurrentURL)
 
 	parsedRawCurrentURL, err := url.Parse(rawCurrentURL)
 	if err != nil {
-		return fmt.Errorf("couldn't parse '%s', err: %v\n", rawCurrentURL, err)
+		fmt.Printf("couldn't parse '%s', err: %v\n", rawCurrentURL, err)
+		return
 	}
 
 	// skip other sites
-	if parsedRawBaseURL.Host != parsedRawCurrentURL.Host {
-		return nil
+	if cfg.BaseURL.Host != parsedRawCurrentURL.Host {
+		return
 	}
 
 	normalizedURL, err := NormalizeURL(rawCurrentURL)
 	if err != nil {
-		return fmt.Errorf("failed to normalize '%s', err: %v", rawCurrentURL, err)
+		fmt.Printf("failed to normalize '%s', err: %v\n", rawCurrentURL, err)
+		return
 	}
 
-	if _, exists := pages[normalizedURL]; exists {
-		pages[normalizedURL]++
-		return nil
-	} else {
-		pages[normalizedURL] = 1
+	// dont parse an already visited site
+	if !cfg.addPageVisit(normalizedURL) {
+		return
 	}
 
 	html, err := GetHTML(rawCurrentURL)
 	if err != nil {
-		return err
+		return
 	}
 
-	fmt.Println()
-	fmt.Println(string(html))
-
-	urls, err := GetURLsFromHTML(string(html), normalizedURL)
+	urls, err := GetURLsFromHTML(string(html), rawCurrentURL)
 	if err != nil {
-		return err
+		fmt.Printf("failed to get urls: %v\n", err)
+		return
 	}
 
 	for _, url := range urls {
-		err := CrawlPage(rawBaseURL, url, pages)
-		if err != nil {
-			return err
-		}
+		cfg.Wg.Add(1)
+		go cfg.CrawlPage(url)
 	}
-	return nil
 }
 
+func (cfg *Config) addPageVisit(normalizedURL string) (isFirst bool) {
+	cfg.Mu.Lock()
+	defer cfg.Mu.Unlock()
+
+	if _, exists := cfg.Pages[normalizedURL]; exists {
+		cfg.Pages[normalizedURL]++
+		return false
+	}
+
+	cfg.Pages[normalizedURL] = 1
+	return true
+}
 func GetHTML(rawURL string) (string, error) {
 	resp, err := http.Get(rawURL)
 	if err != nil {
