@@ -15,6 +15,7 @@ type Config struct {
 	Mu                 *sync.Mutex
 	ConcurrencyControl chan struct{}
 	Wg                 *sync.WaitGroup
+	MaxPages           int
 }
 
 func (cfg *Config) CrawlPage(rawCurrentURL string) {
@@ -24,7 +25,15 @@ func (cfg *Config) CrawlPage(rawCurrentURL string) {
 	}()
 
 	cfg.ConcurrencyControl <- struct{}{}
-	// fmt.Println("crawling", rawCurrentURL)
+
+	cfg.Mu.Lock()
+	if len(cfg.Pages) >= cfg.MaxPages {
+		cfg.Mu.Unlock()
+		return
+	}
+	cfg.Mu.Unlock()
+
+	fmt.Println("crawling", rawCurrentURL)
 
 	parsedRawCurrentURL, err := url.Parse(rawCurrentURL)
 	if err != nil {
@@ -50,6 +59,7 @@ func (cfg *Config) CrawlPage(rawCurrentURL string) {
 
 	html, err := GetHTML(rawCurrentURL)
 	if err != nil {
+		fmt.Printf("failed to get html: %v\n", err)
 		return
 	}
 
