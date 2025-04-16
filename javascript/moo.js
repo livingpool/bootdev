@@ -1,5 +1,2 @@
-const moo = (name) => `moo, ${name}!`;
+export const moo = (name) => `moo, ${name}!`;
 
-module.exports = {
-	moo,
-};

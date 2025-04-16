@@ -2,69 +2,95 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Textio Click-a-thon Prototype</title>
+    <title>🚨 Breaking News</title>
     <style>
       body {
         font-family: sans-serif;
-        margin: 20px;
+        text-align: center;
+        margin: 0;
+        padding: 0;
+      }
+      h1 {
+        color: red;
       }
       button {
-        margin: 5px 5px 5px 0;
-        padding: 8px 14px;
+        padding: 10px 20px;
+        font-size: 16px;
         cursor: pointer;
+        display: none;
+        border-radius: 8px;
+        background-color: #252936;
+        color: #ffffff;
+        border: none;
       }
-      #timer,
-      #counter {
-        font-weight: bold;
-        margin: 5px 0;
+      button:hover {
+        background-color: #3c4d4f;
+      }
+      canvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+      .fullscreen {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      .dark-mode {
+        background-color: #121212;
+        color: #ffffff;
+      }
+      .dark-mode button {
+        background-color: #b2c1d0;
+        color: black;
+      }
+      .dark-mode button:hover {
+        background-color: #919dab;
+      }
+      .dark-mode h1 {
+        color: #ff5555;
       }
     </style>
-  </head>
-  <body>
-    <h1>Textio "Click-a-thon" Challenge</h1>
-    <p>
-      We found that letting users click a button for 5 minutes keeps them too
-      busy to send support emails. Once the timer hits 0, it just
-      <em>resets</em>, so they can keep going!
-    </p>
-    <button id="startButton">Start</button>
-    <button id="clickButton" disabled>Click me!</button>
-    <p id="timer">Time left: 300</p>
-    <p id="counter">Clicks: 0</p>
-
-    <script>
-      let clicks = 0;
-      let countdown = 300;
-
-      function updateUI() {
-        document.getElementById("timer").textContent =
-          `Time left: ${countdown}`;
-        document.getElementById("counter").textContent = `Clicks: ${clicks}`;
+    <script type="module">
+      if (
+        window.matchMedia &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches
+      ) {
+        document.body.classList.add("dark-mode");
       }
-
-      function tick() {
-        if (countdown === 0) {
-          countdown = 300;
-          clicks = 0;
-        }
-        countdown--;
-        updateUI();
-      }
-
-      function onClick() {
-        clicks++;
-        updateUI();
-      }
-
-      function onStart() {
-        document.getElementById("startButton").disabled = true;
-        document.getElementById("clickButton").disabled = false;
-        setInterval(tick, 1000);
-      }
-
-      document.getElementById("startButton").addEventListener("click", onStart);
-      document.getElementById("clickButton").addEventListener("click", onClick);
-      document.getElementById("clickButton").disabled = true;
     </script>
+    <script type="module">
+      import confetti from "https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/+esm";
+
+      const button = document.getElementById("celebrate");
+      button.style.display = "inline-block";
+
+      button.addEventListener("click", () => {
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 },
+        });
+      });
+
+      document.getElementById("headline").textContent =
+        "🚀 JavaScript Takes Over the World!";
+      document.getElementById("loading-text").style.display = "none";
+    </script>
+  </head>
+  <body class="fullscreen">
+    <h1 id="headline">Loading latest news...</h1>
+    <p id="loading-text">
+      (Please wait... our top reporters are investigating!)
+    </p>
+    <button id="celebrate">Celebrate the News! 🎉</button>
   </body>
 </html>
